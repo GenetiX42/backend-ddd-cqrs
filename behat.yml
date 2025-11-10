@@ -7,3 +7,13 @@ default:
         - FeatureContext
   autoload:
     '': features/bootstrap
+
+persistence:
+  suites:
+    default:
+      paths:
+        - features
+      contexts:
+        - DatabaseFeatureContext
+  autoload:
+    '': features/bootstrap

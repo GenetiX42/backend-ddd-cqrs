@@ -10,23 +10,25 @@ use App\Handler\ParkVehicleHandler;
 use App\Handler\RegisterVehicleHandler;
 use App\Handler\GetVehicleLocationHandler;
 use App\Query\GetVehicleLocationQuery;
+use App\Kernel;
 use Behat\Behat\Context\Context;
-use Domain\ValueObject\FleetId;
-use Domain\ValueObject\Location;
-use Domain\ValueObject\VehicleId;
+use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Tools\SchemaTool;
 use Domain\FleetRepositoryInterface;
 use Domain\UserRepositoryInterface;
+use Domain\ValueObject\FleetId;
+use Domain\ValueObject\Location;
 use Domain\ValueObject\UserId;
+use Domain\ValueObject\VehicleId;
 use Domain\VehicleRepositoryInterface;
-use Infra\Repository\InMemoryFleetRepository;
-use Infra\Repository\InMemoryUserRepository;
-use Infra\Repository\InMemoryVehicleRepository;
+use Symfony\Component\Dotenv\Dotenv;
 
 /**
- * Feature context for BDD tests.
+ * Feature context for BDD tests with database persistence.
  */
-class FeatureContext implements Context
+class DatabaseFeatureContext implements Context
 {
+    private Kernel $kernel;
     private FleetRepositoryInterface $fleetRepository;
     private VehicleRepositoryInterface $vehicleRepository;
     private UserRepositoryInterface $userRepository;
@@ -34,6 +36,7 @@ class FeatureContext implements Context
     private RegisterVehicleHandler $registerVehicleHandler;
     private ParkVehicleHandler $parkVehicleHandler;
     private GetVehicleLocationHandler $getVehicleLocationHandler;
+    private EntityManagerInterface $entityManager;
 
     private ?FleetId $myFleetId = null;
     private ?FleetId $anotherUserFleetId = null;
@@ -43,14 +46,26 @@ class FeatureContext implements Context
 
     public function __construct()
     {
-        $this->fleetRepository = new InMemoryFleetRepository();
-        $this->vehicleRepository = new InMemoryVehicleRepository($this->fleetRepository);
-        $this->userRepository = new InMemoryUserRepository();
+        $projectDir = \dirname(__DIR__, 2);
+        if (\class_exists(Dotenv::class) && \is_file($projectDir.'/.env')) {
+            $dotenv = new Dotenv();
+            $dotenv->loadEnv($projectDir.'/.env');
+        }
+
+        $this->kernel = new Kernel('test', true);
+        $this->kernel->boot();
+        $container = $this->kernel->getContainer();
+
+        $this->entityManager = $container->get('doctrine.orm.entity_manager');
+        $this->fleetRepository = $container->get(FleetRepositoryInterface::class);
+        $this->vehicleRepository = $container->get(VehicleRepositoryInterface::class);
+        $this->userRepository = $container->get(UserRepositoryInterface::class);
+
         $this->createFleetHandler = new CreateFleetHandler($this->fleetRepository, $this->userRepository);
         $this->registerVehicleHandler = new RegisterVehicleHandler(
             $this->fleetRepository,
             $this->vehicleRepository,
-            null // No EntityManager for in-memory tests
+            $this->entityManager
         );
         $this->parkVehicleHandler = new ParkVehicleHandler(
             $this->fleetRepository,
@@ -60,6 +75,34 @@ class FeatureContext implements Context
             $this->fleetRepository,
             $this->vehicleRepository
         );
+    }
+
+    /**
+     * @BeforeScenario
+     */
+    public function cleanDatabase(): void
+    {
+        $connection = $this->entityManager->getConnection();
+        $connection->executeStatement('SET session_replication_role = replica');
+
+        try {
+            $connection->executeStatement('DROP TABLE IF EXISTS fleet_vehicles CASCADE');
+            $connection->executeStatement('DROP TABLE IF EXISTS fleets CASCADE');
+            $connection->executeStatement('DROP TABLE IF EXISTS vehicles CASCADE');
+            $connection->executeStatement('DROP TABLE IF EXISTS users CASCADE');
+
+            $schemaTool = new SchemaTool($this->entityManager);
+            $metadata = $this->entityManager->getMetadataFactory()->getAllMetadata();
+
+            if ($metadata === []) {
+                throw new \RuntimeException('No metadata found for Doctrine entities.');
+            }
+
+            $schemaTool->createSchema($metadata);
+            $this->entityManager->clear();
+        } finally {
+            $connection->executeStatement('SET session_replication_role = DEFAULT');
+        }
     }
 
     /**
@@ -276,4 +319,12 @@ class FeatureContext implements Context
             );
         }
     }
+
+    public function __destruct()
+    {
+        if (isset($this->kernel)) {
+            $this->kernel->shutdown();
+        }
+    }
 }
+

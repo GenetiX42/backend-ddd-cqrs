@@ -1,0 +1,54 @@
+parameters:
+
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    App\:
+        resource: '../src/App/*'
+        exclude:
+            - '../src/App/DependencyInjection/'
+            - '../src/App/Entity/'
+
+    Domain\:
+        resource: '../src/Domain/*'
+        exclude:
+            - '../src/Domain/Entity/'
+
+    Infra\:
+        resource: '../src/Infra/*'
+        exclude:
+            - '../src/Infra/Entity/'
+
+    UserInterface\:
+        resource: '../src/UserInterface/*'
+        exclude:
+            - '../src/UserInterface/Entity/'
+
+    # Repository implementations - bind interfaces to database implementations
+    Domain\FleetRepositoryInterface:
+        alias: Infra\Repository\DatabaseFleetRepository
+        public: true
+
+    Domain\VehicleRepositoryInterface:
+        alias: Infra\Repository\DatabaseVehicleRepository
+        public: true
+
+    Domain\UserRepositoryInterface:
+        alias: Infra\Repository\DatabaseUserRepository
+        public: true
+
+    Infra\Repository\DatabaseFleetRepository:
+        arguments:
+            $entityManager: '@doctrine.orm.entity_manager'
+
+    Infra\Repository\DatabaseVehicleRepository:
+        arguments:
+            $entityManager: '@doctrine.orm.entity_manager'
+            $fleetRepository: '@Domain\FleetRepositoryInterface'
+
+    Infra\Repository\DatabaseUserRepository:
+        arguments:
+            $entityManager: '@doctrine.orm.entity_manager'
+
