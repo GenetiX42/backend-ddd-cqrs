@@ -52,3 +52,15 @@ services:
         arguments:
             $entityManager: '@doctrine.orm.entity_manager'
 
+    # Transaction manager implementations
+    Infra\Transaction\DoctrineTransactionManager:
+        arguments:
+            $entityManager: '@doctrine.orm.entity_manager'
+
+    Infra\Transaction\InMemoryTransactionManager: ~
+
+    # Bind TransactionManagerInterface to Doctrine implementation (for production)
+    Domain\TransactionManagerInterface:
+        alias: Infra\Transaction\DoctrineTransactionManager
+        public: true
+

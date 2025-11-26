@@ -15,6 +15,7 @@ use Behat\Behat\Context\Context;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
 use Domain\FleetRepositoryInterface;
+use Domain\TransactionManagerInterface;
 use Domain\UserRepositoryInterface;
 use Domain\ValueObject\FleetId;
 use Domain\ValueObject\Location;
@@ -32,6 +33,7 @@ class DatabaseFeatureContext implements Context
     private FleetRepositoryInterface $fleetRepository;
     private VehicleRepositoryInterface $vehicleRepository;
     private UserRepositoryInterface $userRepository;
+    private TransactionManagerInterface $transactionManager;
     private CreateFleetHandler $createFleetHandler;
     private RegisterVehicleHandler $registerVehicleHandler;
     private ParkVehicleHandler $parkVehicleHandler;
@@ -60,12 +62,13 @@ class DatabaseFeatureContext implements Context
         $this->fleetRepository = $container->get(FleetRepositoryInterface::class);
         $this->vehicleRepository = $container->get(VehicleRepositoryInterface::class);
         $this->userRepository = $container->get(UserRepositoryInterface::class);
+        $this->transactionManager = $container->get(TransactionManagerInterface::class);
 
         $this->createFleetHandler = new CreateFleetHandler($this->fleetRepository, $this->userRepository);
         $this->registerVehicleHandler = new RegisterVehicleHandler(
             $this->fleetRepository,
             $this->vehicleRepository,
-            $this->entityManager
+            $this->transactionManager
         );
         $this->parkVehicleHandler = new ParkVehicleHandler(
             $this->fleetRepository,

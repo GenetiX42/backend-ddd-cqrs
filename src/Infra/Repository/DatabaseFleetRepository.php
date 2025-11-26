@@ -64,27 +64,20 @@ final class DatabaseFleetRepository implements FleetRepositoryInterface
     public function findById(FleetId $fleetId): ?Fleet
     {
         $fleetEntity = $this->entityManager->getRepository(FleetEntity::class)->find($fleetId->toString());
-
+        
         if ($fleetEntity === null) {
             return null;
         }
-
+    
         $userId = UserId::fromString($fleetEntity->getUser()->getId());
         $fleet = Fleet::createForUser($fleetId, $userId);
-
-        // Load vehicles using reflection to bypass domain validation
-        $reflection = new \ReflectionClass($fleet);
-        $vehiclesProperty = $reflection->getProperty('vehicles');
-        $vehiclesProperty->setAccessible(true);
-
-        $vehiclesArray = [];
+    
+        // Charger les véhicules en respectant les règles métier
         foreach ($fleetEntity->getVehicles() as $vehicleEntity) {
             $vehicleId = VehicleId::fromPlateNumber($vehicleEntity->getPlateNumber());
-            $vehiclesArray[] = $vehicleId;
+            $fleet->registerVehicle($vehicleId);
         }
-
-        $vehiclesProperty->setValue($fleet, $vehiclesArray);
-
+    
         return $fleet;
     }
 }

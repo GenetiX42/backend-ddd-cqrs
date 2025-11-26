@@ -21,6 +21,8 @@ use Domain\VehicleRepositoryInterface;
 use Infra\Repository\InMemoryFleetRepository;
 use Infra\Repository\InMemoryUserRepository;
 use Infra\Repository\InMemoryVehicleRepository;
+use Infra\Transaction\InMemoryTransactionManager;
+use Domain\TransactionManagerInterface;
 
 /**
  * Feature context for BDD tests.
@@ -30,6 +32,7 @@ class FeatureContext implements Context
     private FleetRepositoryInterface $fleetRepository;
     private VehicleRepositoryInterface $vehicleRepository;
     private UserRepositoryInterface $userRepository;
+    private TransactionManagerInterface $transactionManager;
     private CreateFleetHandler $createFleetHandler;
     private RegisterVehicleHandler $registerVehicleHandler;
     private ParkVehicleHandler $parkVehicleHandler;
@@ -46,11 +49,12 @@ class FeatureContext implements Context
         $this->fleetRepository = new InMemoryFleetRepository();
         $this->vehicleRepository = new InMemoryVehicleRepository($this->fleetRepository);
         $this->userRepository = new InMemoryUserRepository();
+        $this->transactionManager = new InMemoryTransactionManager();
         $this->createFleetHandler = new CreateFleetHandler($this->fleetRepository, $this->userRepository);
         $this->registerVehicleHandler = new RegisterVehicleHandler(
             $this->fleetRepository,
             $this->vehicleRepository,
-            null // No EntityManager for in-memory tests
+            $this->transactionManager
         );
         $this->parkVehicleHandler = new ParkVehicleHandler(
             $this->fleetRepository,
